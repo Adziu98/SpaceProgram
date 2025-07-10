@@ -4,6 +4,7 @@ import com.space.program.contact.Mission;
 import com.space.program.contact.MissionStatus;
 import com.space.program.contact.Rocket;
 import com.space.program.contact.RocketStatus;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -11,11 +12,12 @@ import java.util.stream.Collectors;
 import static com.space.program.contact.MissionStatus.SCHEDULED;
 import static com.space.program.contact.RocketStatus.ON_GROUND;
 
+@Slf4j
 public class SpaceProgramService {
     private Map<String, Mission> missions = new HashMap<>();
     private Map<String, Rocket> rockets = new HashMap<>();
 
-    public void addMission(String destination) {
+    public Mission addMission(String destination) {
         if (destination != null) {
             if (!missions.containsKey(destination)) {
                 Mission mission = Mission.builder()
@@ -24,14 +26,16 @@ public class SpaceProgramService {
                         .build();
 
                 missions.put(destination, mission);
-                System.out.println("Mission: " + destination + " has been added successfully!");
-                return;
+                log.info("Mission: " + destination + " has been added successfully!");
+                return mission;
             }
-            System.out.println("Mission: " + destination + " already exists!");
+            log.error("Mission: " + destination + " already exists!");
+            throw new IllegalArgumentException("Mission: " + destination + " already exists!");
         }
+        throw new IllegalArgumentException("Null values are not allowed");
     }
 
-    public void addRocket(String rocketName) {
+    public Rocket addRocket(String rocketName) {
         if (rocketName != null) {
             if (!rockets.containsKey(rocketName)) {
                 Rocket rocket = Rocket.builder()
@@ -40,39 +44,40 @@ public class SpaceProgramService {
                         .build();
 
                 rockets.put(rocketName, rocket);
-                System.out.println("Rocket: " + rocketName + " has been added successfully!");
-                return;
+                log.info("Rocket: " + rocketName + " has been added successfully!");
+                return rocket;
             }
-            System.out.println("Rocket: " + rocketName + " already exists!");
+            throw new IllegalArgumentException("Rocket: " + rocketName + " already exists!");
         }
+        throw new IllegalArgumentException("Null values are not allowed");
     }
 
     public void changeRocketStatus(String rocketName, String rocketStatusToChange) {
         Rocket rocket = rockets.get(rocketName);
 
         if (rocket == null) {
-            System.out.println("Rocket does not exist!");
+            throw new IllegalArgumentException("Rocket does not exist!");
         }
         if (!containsRocketStatus(rocketStatusToChange)) {
-            System.out.println("Rocket status does not exist!");
+            throw new IllegalArgumentException("Rocket status does not exist!");
         }
 
         rocket.setRocketStatus(RocketStatus.valueOf(rocketStatusToChange));
-        System.out.println("Rocket status has been changed to: " + rocketStatusToChange);
+        log.info("Rocket status has been changed to: " + rocketStatusToChange);
     }
 
     public void changeMissionStatus(String destination, String missionStatusToChange) {
         Mission mission = missions.get(destination);
 
         if (mission == null) {
-            System.out.println("Mission does not exist!");
+            throw new IllegalArgumentException("Mission does not exist!");
         }
         if (!containsMissionStatus(missionStatusToChange)) {
-            System.out.println("Mission status does not exist!");
+            throw new IllegalArgumentException("Mission status does not exist!");
         }
 
         mission.setMissionStatus(MissionStatus.valueOf(missionStatusToChange));
-        System.out.println("Mission status has been changed to: " + missionStatusToChange);
+        log.info("Mission status has been changed to: " + missionStatusToChange);
     }
 
     public void assignMissionToRocket(String rocketName, String destination) {
@@ -80,17 +85,18 @@ public class SpaceProgramService {
         Mission mission = missions.get(destination);
 
         if (rocket == null || mission == null) {
-            System.out.println("Rocket or Mission does not exist!");
+            throw new IllegalArgumentException("Rocket or Mission does not exist!");
         }
 
         if (Optional.ofNullable(rocket.getMission()).isPresent()) {
-            System.out.println("Rocket has already assigned mission!");
+            throw new IllegalArgumentException("Rocket has already assigned mission!");
         }
 
         rocket.setMission(mission);
-        System.out.println("Mission: " + destination + " has been added to rocket: " + rocketName + " successfully!");
+        log.info("Mission: " + destination + " has been added to rocket: " + rocketName + " successfully!");
     }
-    public void showAllData() {
+
+    public void showSummaryOfSpaceProgram() {
         Map<MissionStatus, Map<String, List<Rocket>>> grouped = groupRocketsByStatusAndDestination();
 
         for (MissionStatus status : MissionStatus.values()) {
@@ -112,8 +118,7 @@ public class SpaceProgramService {
             Mission mission = rocket.getMission();
             if (mission == null) continue;
 
-            grouped
-                    .computeIfAbsent(mission.getMissionStatus(), k -> new HashMap<>())
+            grouped.computeIfAbsent(mission.getMissionStatus(), k -> new HashMap<>())
                     .computeIfAbsent(mission.getDestination(), k -> new ArrayList<>())
                     .add(rocket);
         }
@@ -131,15 +136,16 @@ public class SpaceProgramService {
     }
 
     private void printMissionSummary(String missionName, MissionStatus status, List<Rocket> rockets) {
-        System.out.println(missionName + " - " + status + " - " + rockets.size());
-        for (int i = 0; i < rockets.size(); i++) {
-            Rocket rocket = rockets.get(i);
-            System.out.print(rocket.getName() + " - " + rocket.getRocketStatus());
-            if (i < rockets.size() - 1) {
-                System.out.print("\n");
-            }
-        }
-        System.out.println("\n");
+        String rocketSummary = rockets.stream()
+                .map(rocket -> rocket.getName() + " - " + rocket.getRocketStatus())
+                .collect(Collectors.joining("\n"));
+
+        String summary = String.format(
+                "%s - %s - %d rockets\n%s",
+                missionName, status, rockets.size(), rocketSummary
+        );
+
+        log.info(summary);
     }
 
 
